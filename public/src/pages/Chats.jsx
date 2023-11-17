@@ -2,7 +2,7 @@ import styled from "styled-components"
 import { useState, useEffect , useRef} from 'react'
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { allUsersRoute, host } from "../utils/APIRoutes";
+import { allQueueRoute, host } from "../utils/APIRoutes";
 import Contacts from "../components/Contacts";
 import Welcome from "../components/Welcome";
 import ChatContainer from "../components/ChatContainer";
@@ -35,7 +35,21 @@ export default function Chats() {
    useEffect(()=>{
     if(currentUser){
       socket.current = io(host);
-      socket.current.emit("add-user", currentUser._id);
+      socket.current.emit("add-agent", currentUser._id);
+      
+      // new user add queue
+      socket.current.on("add-user", (data) => {
+        setContacts((prev)=>[...prev,data]);
+      })
+
+      // remove user from queue
+      socket.current.on("remove-user", (data) => {
+        if(contacts != null && contacts.length > 0){
+          const newContacts = contacts.filter((x) => x._id != data._id);
+          setContacts(newContacts);
+        }
+      })
+
     }
    },[currentUser]);
 
@@ -43,7 +57,8 @@ export default function Chats() {
     const getCurrentUser = async()=>{
       if( currentUser)  {
       if(currentUser.isAvatarImageSet){
-        const data = await  axios.get(`${allUsersRoute}/${currentUser._id}`);
+        //const data = await  axios.get(`${allUsersRoute}/${currentUser._id}`);
+        const data = await  axios.get(`${allQueueRoute}`);
         setContacts(data.data);
       } else{
         navigate('/setAvatar');

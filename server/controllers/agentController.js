@@ -1,10 +1,11 @@
-const User = require("../models/userModel");
+const agentModel = require("../models/agentModel");
+const queueModel = require("../models/queueModel");
 const bcrypt = require("bcrypt");
 
 module.exports.login = async (req, res, next) => {
   try {
     const { username, password } = req.body;
-    const user = await User.findOne({ username });
+    const user = await agentModel.findOne({ username });
     if (!user)
       return res.json({ msg: "Incorrect Username ", status: false });
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -20,14 +21,14 @@ module.exports.login = async (req, res, next) => {
 module.exports.register = async (req, res, next) => {
     try {
       const { username, email, password } = req.body;
-      const usernameCheck = await User.findOne({ username });
+      const usernameCheck = await agentModel.findOne({ username });
       if (usernameCheck)
         return res.json({ msg: "Username already used", status: false });
-      const emailCheck = await User.findOne({ email });
+      const emailCheck = await agentModel.findOne({ email });
       if (emailCheck)
         return res.json({ msg: "Email already used", status: false });
       const hashedPassword = await bcrypt.hash(password, 10);
-      const user = await User.create({
+      const user = await agentModel.create({
         email,
         username,
         password: hashedPassword,
@@ -43,7 +44,7 @@ module.exports.register = async (req, res, next) => {
     try {
       const userId = req.params.id;
       const avatarImage = req.body.image;
-      const userData = await User.findByIdAndUpdate(
+      const userData = await agentModel.findByIdAndUpdate(
         userId,
         {
           isAvatarImageSet: true,
@@ -62,7 +63,7 @@ module.exports.register = async (req, res, next) => {
 
   module.exports.getAllUsers = async (req, res, next) => {
     try {
-      const users  = await User.find({
+      const users  = await agentModel.find({
         _id:{ $ne:req.params.id }
       }).select([
         "email",
@@ -79,9 +80,24 @@ module.exports.register = async (req, res, next) => {
   module.exports.logOut = (req, res, next) => {
     try {
       if (!req.params.id) return res.json({ msg: "User id is required " });
-      onlineUsers.delete(req.params.id);
+      onlineAgent.delete(req.params.id);
       return res.status(200).send();
     } catch (ex) {
       next(ex);
+    }
+  };
+
+  module.exports.getAllQueue = async (req, res, next) => {
+    try {
+      const users  = await queueModel.find({isInQueue:true}).select([
+        "isInQueue",
+        "agentId",
+        "userName",
+        "conversationIdReference",
+        "_id"
+      ]);
+      return res.json(users);
+    } catch (err) {
+      next(err);
     }
   };

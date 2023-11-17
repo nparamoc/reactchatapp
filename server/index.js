@@ -3,17 +3,25 @@ const app = express();
 const cors  = require("cors");
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
-const userRoutes = require("./routes/userRoutes");
+const agentRoutes = require("./routes/agentRoutes");
 const messageRoute = require("./routes/messagesRoute");
+const queueRoute = require("./routes/queueRoute");
 const socket = require("socket.io");
 
 dotenv.config();
 app.use(cors());
 app.use(express.json());
 
-app.use("/api/auth", userRoutes);
-app.use("/api/message", messageRoute);
+//store all online users inside this map
+global.onlineAgent =  new Map();
+global.onlineUser =  new Map();
+global.chatSocket = null;
 
+app.use("/api/auth", agentRoutes);
+app.use("/api/message", messageRoute);
+app.use("/api/chat", queueRoute)
+
+mongoose.set('strictQuery', true);
 //mongoose connection
 mongoose.connect(process.env.MONGO_URL, {
     useNewUrlParser: true,
@@ -22,9 +30,12 @@ mongoose.connect(process.env.MONGO_URL, {
         console.log("DB Connection Successful!")
     }).catch((err) => console.log(err));
 
- const server = app.listen(process.env.PORT, ()=>{
+
+
+const server = app.listen(process.env.PORT, ()=>{
     console.log(`Server started on Port ${process.env.PORT}`);
 });
+
 
 const io = socket(server,{
     cors: {
@@ -32,19 +43,29 @@ const io = socket(server,{
         credentials: true,
     },
 });
-//store all online users inside this map
-global.onlineUsers =  new Map();
+
  
 io.on("connection",(socket)=>{
-    global.chatSocket = socket;
-    socket.on("add-user",(userId)=>{
-        onlineUsers.set(userId,socket.id);
+    
+    socket.on("add-agent",(userId)=>{
+        console.log('new agent: ' + socket.id)
+        onlineAgent.set(userId,socket.id);
+        //onlineAgent.set(userId,socket.id);
     });
 
     socket.on("send-msg",(data)=>{
-        const sendUserSocket = onlineUsers.get(data.to);
+        const sendUserSocket = onlineAgent.get(data.to);
         if(sendUserSocket) {
+            // sent to specifict client connection
             socket.to(sendUserSocket).emit("msg-recieved",data.message);
         }
     });
+
 });
+
+io.on("disconnect", (socket) => {
+    console.log('delete agent: ' + socket.id)
+    //onlineAgent.delete(socket.id);
+});
+
+global.chatSocket = io;

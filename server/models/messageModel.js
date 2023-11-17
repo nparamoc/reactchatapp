@@ -6,9 +6,11 @@ const messageSchema = mongoose.Schema(
       text: { type: String, required: true },
     },
     users: Array,
-    sender: {
+    conversationId: { type: String, required: true },
+    user: { type: String, required: true },
+    agent: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Agent",
       required: true,
     },
   },
