@@ -7,6 +7,7 @@ const agentRoutes = require("./routes/agentRoutes");
 const messageRoute = require("./routes/messagesRoute");
 const queueRoute = require("./routes/queueRoute");
 const socket = require("socket.io");
+const sessionModel = require("./models/agentSessionModel");
 
 dotenv.config();
 app.use(cors());
@@ -47,12 +48,25 @@ const io = socket(server,{
  
 io.on("connection",(socket)=>{
     
-    socket.on("add-agent",(userId)=>{
-        console.log('new agent: ' + socket.id)
-        onlineAgent.set(userId,socket.id);
-        //onlineAgent.set(userId,socket.id);
+    console.log(`socket.id: ${socket.id} - socket.sessionId: ${socket.sessionId} - socket.userId: ${socket.userId}`);
+    
+    // persist session
+    
+    createSession({
+        sessionId: socket.sessionId,
+        agent: socket.userId,
+        connected: true,
     });
+    
+    // join the "userId" room
+    socket.join(socket.userId);
 
+    // emit session details to specifict room
+    socket.to(socket.userId).emit("add-session", {
+        sessionId: socket.sessionId,
+        userId: socket.userId
+    });
+     
     socket.on("send-msg",(data)=>{
         const sendUserSocket = onlineAgent.get(data.to);
         if(sendUserSocket) {
@@ -63,9 +77,49 @@ io.on("connection",(socket)=>{
 
 });
 
-io.on("disconnect", (socket) => {
-    console.log('delete agent: ' + socket.id)
-    //onlineAgent.delete(socket.id);
+// io middleware
+io.use((socket, next) => {
+    
+    const sessionId = socket.handshake.auth.sessionId;
+    if (sessionId) {
+        // find existing session
+        const session = sessionModel.findOne({ sessionId: sessionId });
+        if (session) {
+          console.log('Exist')
+          socket.sessionId = session.sessionId;
+          socket.userId = session.agent;
+          return next();
+        }
+    }
+
+    const userId = socket.handshake.auth.userId;
+    if (!userId) {
+        return next(new Error("invalid userId"));
+    }
+    console.log('New')
+    // create new session
+    socket.sessionId = randomId();
+    socket.userId = userId;
+    next();
 });
 
 global.chatSocket = io;
+
+
+
+function randomId() { 
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
+    .replace(/[xy]/g, function (c) { 
+        const r = Math.random() * 16 | 0,  
+            v = c == 'x' ? r : (r & 0x3 | 0x8); 
+        return v.toString(16); 
+    }); 
+}
+
+async function createSession (data){
+    const newSession = await sessionModel.create({
+        sessionId: data.sessionId,
+        connected: data.connected,
+        agent:data.agent,
+    });
+}

@@ -34,13 +34,36 @@ export default function Chats() {
 
    useEffect(()=>{
     if(currentUser){
-      socket.current = io(host);
-      socket.current.emit("add-agent", currentUser._id);
       
+      const userId  = currentUser._id;
+      const sessionId = localStorage.getItem("sessionID");
+
+      if (sessionId) {
+        socket.current = io(host);
+        socket.current.auth = {  sessionId  };
+        socket.current.connect();
+      }else{
+        socket.current = io(host, { autoConnect: false });
+        socket.current.auth = {  userId  };
+        socket.current.connect();
+      }
+
+      //socket.current.emit("add-agent", userId);
+      socket.current.on("add-session", (data) => {
+        const { sessionId, userId } = data;
+        console.log(data.sessionId + ' - ' + data.userId)
+        // attach the session ID to the next reconnection attempts
+        socket.auth = { sessionId };
+        // store it in the localStorage
+        localStorage.setItem("sessionID", sessionId);
+        // save the ID of the user
+        socket.userId = userId;
+      })
+
       // new user add queue
       socket.current.on("add-user", (data) => {
         setContacts((prev)=>[...prev,data]);
-      })
+      });
 
       // remove user from queue
       socket.current.on("remove-user", (data) => {
@@ -48,7 +71,7 @@ export default function Chats() {
           const newContacts = contacts.filter((x) => x._id != data._id);
           setContacts(newContacts);
         }
-      })
+      });
 
     }
    },[currentUser]);
@@ -75,7 +98,8 @@ export default function Chats() {
   return (
     <Container>
       <div className="container">
-        <Contacts contacts={contacts} currentUser={currentUser}  changeChat={handleChatChange}/>
+        
+        <Contacts contacts={contacts} currentUser={currentUser} socket={socket}  changeChat={handleChatChange}/>
         { isLoaded &&
           currentChat === undefined ?
            <Welcome currentUser={currentUser}/> : 

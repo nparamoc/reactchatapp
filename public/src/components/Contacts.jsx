@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import styled from "styled-components"
 import Logo from '../assets/logo.svg'
+import Logout from './Logout';
 
-export default function Contacts({ contacts, currentUser, changeChat }) {
+export default function Contacts({ contacts, currentUser, socket, changeChat }) {
     const [currentUserName, setCurrentUserName] = useState(undefined);
     const [currentUserImage, setCurrentUserImage] = useState(undefined);
     const [currentSelected, setCurrentSelected] = useState(undefined);
@@ -26,6 +27,7 @@ export default function Contacts({ contacts, currentUser, changeChat }) {
                         <div className="brand">
                             <img src={Logo} alt="logo" />
                             <h3>RChat</h3>
+                            <Logout socket={socket} />
                         </div>
                         <div className="contacts">
                             {
@@ -42,6 +44,9 @@ export default function Contacts({ contacts, currentUser, changeChat }) {
                                             </div>
                                             <div className="username">
                                                 <h3>{contact.userName}</h3>
+                                            </div>
+                                            <div className="status">
+                                              <Dot></Dot>
                                             </div>
                                         </div>
                                     )
@@ -150,5 +155,12 @@ const Container = styled.div`
       }
     }
   }
+`;
+const Dot = styled.div`
+  height: 25px;
+  width: 25px;
+  background-color: green;
+  border-radius: 50%;
+  display: inline-block;
 `;
 

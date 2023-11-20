@@ -3,6 +3,29 @@ const messageModel = require("../models/messageModel");
 
 module.exports.addMessage = async (req, res, next) => {
     try {
+
+
+        // sent to specifict client connection
+        //chatSocket.to(req.kind).emit("add-session",req.message);
+
+        let users ={};
+        for (let [id, socket] of chatSocket.of("/").sockets) {
+            console.log(`socket.id: ${socket.id} - socket.sessionId: ${socket.sessionID} - socket.userId: ${socket.userID}`);
+          }
+        
+
+        chatSocket.to(req.kind).to(req.conversationId).emit("add-session",req.message);
+        chatSocket.to(req.kind).emit("add-session", req.message);
+
+        return res.status(200).json({
+            msg: "Message sent successfully!",
+            state: 200,
+            response: {
+                id:1
+            }
+        });
+
+
         const body =  req.body;
         
         // validations
