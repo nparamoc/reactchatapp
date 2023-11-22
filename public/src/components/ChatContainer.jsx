@@ -3,7 +3,7 @@ import styled from "styled-components"
 import ChatInput from './ChatInput';
 import Logout from './Logout';
 import axios from "axios";
-import { ToastContainer, toast } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { getAllMessagesRoute, sendMessageRoute, pickUserRoute } from '../utils/APIRoutes'
 import { v4 as uuidv4} from "uuid";
@@ -13,64 +13,85 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
   const [inputEnable, setinputEnable] = useState(false);
   const [arrivalMessage, setArrivalMessage] = useState(null);
   const scrollRef = useRef();
+  const doRequest = useRef(false);
 
   const toastOptions = {
-    position: "bottom-right",
+    //position: "bottom-right",
     autoClose: 8000,
-    pauseOnHover: true,
-    draggable: true,
+    //pauseOnHover: true,
+    //draggable: true,
     theme: "dark",
   };
 
-  useEffect(() => {
+  
 
-    const pickUser = async () => {
-      if(currentChat){
-        const response = await axios.post(pickUserRoute, {
-          agentId: currentUser._id,
-          conversationId: currentChat._id,
-          kind: 'kind_abc',
-          channel: 'channel_abc',
-        });
-
-        if(response.status != 200 ) {
-          toast.error("Internal error", toastOptions);
-          return;
-        }
-        
-        const msj = await axios.post(getAllMessagesRoute, {
-          from: currentUser._id,
-          to: currentChat._id,
-        });
-        
-        if(msj.status != 200 ) {
-          toast.error("Internal error", toastOptions);
-          return;
-        }
-
-        setMessages(msj.data);
-        setinputEnable(true);
-      }
+  /**
+   * Init functions
+   */
+  const initFunctions = async()=>{
+    console.log(JSON.stringify(currentChat))
+    if(currentChat){
+      await pickUser();
+      await getAllMessages();
+      setinputEnable(true);
     }
-    pickUser();
-  }, [currentChat]);
+  }
 
-  {/*
-  useEffect(() => {
+  /**
+   * Select user and assing an agent
+   * @returns 
+   */
+  const pickUser = async () => {
+    if(currentUser){
+      const response = await axios.post(pickUserRoute, {
+        agentId: currentUser._id,
+        conversationId: currentChat._id,
+        kind: 'kind_abc',
+        channel: 'channel_abc',
+      });
 
-    const fetchData = async () => {
-      if(currentChat){
-        const response = await axios.post(getAllMessagesRoute, {
-          from: currentUser._id,
-          to: currentChat._id,
-        });
-        setMessages(response.data);
+      if(response.status != 200 ) {
+        toast.error("Internal error", toastOptions);
+        return false;
       }
-    }
-    fetchData();
-  }, [currentChat]);
-  */}
 
+      if(response.data.state == 100 ) {
+        toast.error("User already assigned", toastOptions);
+        return false;
+      }
+
+      return true;
+    }
+
+    return false;
+  }
+ 
+  /**
+   * Get all user messages
+   * @returns 
+   */
+  const getAllMessages = async()=>{
+    if( currentChat)  {
+      const msj = await axios.post(getAllMessagesRoute, {
+        from: currentChat._id,
+        to: currentUser._id,
+      });
+      
+      if(msj.status != 200 ) {
+        toast.error("Internal error", toastOptions);
+        return;
+      }
+      setMessages(msj.data);
+    }
+  }
+
+  useEffect(() => {
+    if(doRequest.current) initFunctions();
+    else doRequest.current = true;
+  },[currentChat]);
+
+
+ 
   const handleSendMsg = async (msg) => {
     await axios.post(sendMessageRoute, {
       from: currentUser._id,
@@ -91,16 +112,15 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
     setMessages(msgs);
   };
 
+ 
   useEffect(() => {
-    if (socket.current) {
-      socket.current.on("msg-recieved", (msg) => {
-        console.log(msg)
-        setArrivalMessage({
-          fromSelf: false,
-          message: msg,
-        });
-      })
-    }
+    socket.current.on("msg-recieved", (msg) => {
+      console.log(`msg-recieved ${msg}`)
+      setArrivalMessage({
+        fromSelf: false,
+        message: msg,
+      });
+    })
   }, []);
 
   useEffect(()=>{

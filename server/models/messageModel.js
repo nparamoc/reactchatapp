@@ -11,8 +11,9 @@ const messageSchema = mongoose.Schema(
     agent: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Agent",
-      required: true,
+      required: false,
     },
+    sender: { type: String, required: true },
   },
   {
     timestamps: true,

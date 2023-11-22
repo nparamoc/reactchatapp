@@ -1,32 +1,23 @@
 const queueModel = require("../models/queueModel");
 const messageModel = require("../models/messageModel");
+const agentSessionModel = require("../models/agentSessionModel");
+const agentModel = require("../models/agentModel");
 
 module.exports.addMessage = async (req, res, next) => {
     try {
 
-
-        // sent to specifict client connection
-        //chatSocket.to(req.kind).emit("add-session",req.message);
-
-        let users ={};
-        for (let [id, socket] of chatSocket.of("/").sockets) {
-            console.log(`socket.id: ${socket.id} - socket.sessionId: ${socket.sessionID} - socket.userId: ${socket.userID}`);
-          }
-        
-
-        chatSocket.to(req.kind).to(req.conversationId).emit("add-session",req.message);
-        chatSocket.to(req.kind).emit("add-session", req.message);
-
-        return res.status(200).json({
-            msg: "Message sent successfully!",
-            state: 200,
-            response: {
-                id:1
-            }
-        });
-
-
         const body =  req.body;
+
+        ///////// agent
+        /*
+        io.to(body.kind).emit("msg-recieved", body.message);
+        io.to(body.channel).emit("msg-recieved", body.message);
+        return res.status(200).json({
+            msg: "body mustn't d",
+            state: 200
+        });
+        */
+        ////
         
         // validations
         if(body == null || body == undefined) return res.status(400).json({
@@ -42,53 +33,79 @@ module.exports.addMessage = async (req, res, next) => {
             state: 400
         });
 
-        if(onlineAgent == null || onlineAgent == undefined) return res.status(500).json({
-            msg: "Not Agent error ",
-            state: 500
-        });
+         // get queue
+         let filter = { _id: body.conversationId  };
+         const queueEntity = await queueModel.findOne(filter);
+         if(queueEntity == null ) return res.status(500).json({
+             msg: "Error not exist conversationId",
+             state: 500
+         });
 
-        
-        // get user from queue
-        const filter = { _id: body.conversationId  };
-        let queue = await queueModel.findOne(filter);
+         // there is agent assigned
+         if(queueEntity.agentId != null && queueEntity.agentId != '' ){
+            
+            // get agent session
+            filter = { agent: queueEntity.agentId };
+            const onlineAgent = await agentSessionModel.findOne(filter);
+            if(onlineAgent == null) return res.status(500).json({
+                msg: "Agent error ",
+                state: 500
+            });
+            
+            console.log(`onlineAgent: ${onlineAgent.agent} - body.kind: ${body.kind}`);
 
-        if(! queue) return res.status(500).json({
-            msg: "Error not exist conversationId",
-            state: 500
-        });
+            // sent to specifict room connection
+            io.to(onlineAgent.agent.toString()).emit("msg-recieved", body.message.toString());
 
-        const getAgentSocket = onlineAgent.get(queue.agentId);
-        if(getAgentSocket) res.status(500).json({
-            msg: "Invalid agent",
-            state: 500
-        });
+            // create message
+            const message = await messageModel.create({
+                message:{
+                    text: body.message
+                },
+                sender: queueEntity._id,
+                users: [
+                    queueEntity._id,
+                    onlineAgent.agent
+                ],
+                conversationId: queueEntity._id,
+                user: queueEntity._id,
+                agent:onlineAgent.agent,
+            });
 
-        
-        // create message
-        const message = await messageModel.create({
-            message:{
-                text: body.message
-            },
-            users: [
-                queue.agentId,
-                queue._id,
-                body.conversationId
-            ],
-            conversationId: body.conversationId,
-            user: queue._id,
-            agent:queue.agentId,
-        });
+            
+            if(message) return res.status(200).json({
+                msg: "Message sent successfully!",
+                state: 200,
+                response: {
+                    id: message._id
+                }
+            });
+            
+        }else{
+            
+            // create message
+            const message = await messageModel.create({
+                message:{
+                    text: body.message
+                },
+                sender: queueEntity._id,
+                users: [
+                    queueEntity._id
+                ],
+                conversationId: queueEntity._id,
+                user: queueEntity._id,
+                agent: null,
+            });
 
-        // sent to specifict client connection
-        chatSocket.to(getAgentSocket).emit("msg-recieved",body.message);
-
-        if(message) return res.status(200).json({
-            msg: "Message sent successfully!",
-            state: 200,
-            response: {
-                id: message._id
-            }
-        });
+            if(message) return res.status(200).json({
+                msg: "Message sent successfully!",
+                state: 200,
+                response: {
+                    id: message._id
+                }
+            });
+        }
+         
 
         return res.status(500).json({
             msg: "Internal server error",
@@ -119,11 +136,6 @@ module.exports.addUserQueue = async (req, res, next) => {
             state: 400
         });
 
-        if(onlineAgent == null || onlineAgent == undefined) return res.status(500).json({
-            msg: "Not Agent error ",
-            state: 500
-        });
-        
         const queue = await queueModel.create({
             agentId: '',
             isInQueue:true,
@@ -146,8 +158,9 @@ module.exports.addUserQueue = async (req, res, next) => {
         };
         
         // notify all agent
-        socket.emit("add-user", addUser );
-
+        io.emit("user-connected", addUser);
+        
+        
         return res.status(200).json({
             msg: "Message sent successfully!",
             state: 200,
@@ -179,14 +192,40 @@ module.exports.pickUserQueue = async (req, res, next) => {
             state: 400
         });
 
-        if(onlineAgent == null || onlineAgent == undefined) return res.status(500).json({
-            msg: "Not Agent error ",
+        // get queue
+        let filter = { _id: body.conversationId  };
+        const queueEntity = await queueModel.findOne(filter);
+        if(queueEntity == null ) return res.status(500).json({
+            msg: "Error not exist conversationId",
             state: 500
         });
 
-       
-        const filter = { _id: body.conversationId  };
-        const update = { agentId: body.agentId, isInQueue:true  };
+        // user already asigned 
+        if(queueEntity.agentId != null && queueEntity.agentId != '' ) return res.status(200).json({
+            msg: "User queue already asigned",
+            state: 100
+        });
+
+        // get agent
+        filter = { _id: body.agentId  };
+        let agentEntity = await agentModel.findOne(filter);
+        if( agentEntity == null ) return res.status(500).json({
+            msg: "Agent Id error ",
+            state: 500
+        });
+
+        // get agent session
+        filter = { agent: agentEntity._id  };
+        let agentSessionEntity = await agentSessionModel.findOne(filter);
+        if(agentSessionEntity == null) return res.status(500).json({
+            msg: "Agent error ",
+            state: 500
+        });
+
+        
+        // update queue
+        filter = { _id: body.conversationId  };
+        let update = { agentId: body.agentId, isInQueue:true  };
         let doc = await queueModel.findOneAndUpdate(filter, update);
 
         if(! doc) return res.status(400).json({
@@ -194,10 +233,17 @@ module.exports.pickUserQueue = async (req, res, next) => {
             state: 400
         });
 
+        // get queue
         doc = await queueModel.findOne(filter);
        
+        // update all message without agent
+        filter = { user: doc._id, agent: null  };
+        update = { agent: agentEntity._id, users:[ doc._id , agentEntity._id]  };
+        await messageModel.updateMany(filter, update);
+        
         return res.json({
             msg: "Message sent successfully!",
+            state: 200,
             response: {
                 conversationId: doc._id,
                 agentId: doc.agentId,

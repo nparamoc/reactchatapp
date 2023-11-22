@@ -18,6 +18,62 @@ export default function Chats() {
   const [isLoaded, setIsLoaded] = useState(false);
   
 
+  const setUpSocket = async()=>{
+   
+    const userId  = currentUser._id;
+    const sessionId = localStorage.getItem("sessionID");
+
+    socket.current = io(host, { autoConnect: false });
+    if (sessionId) {
+      socket.current.auth = {  sessionId  };
+    }else{
+      socket.current.auth = {  userId  };
+    }
+    socket.current.connect();
+
+    socket.current.on("agent-session", (data) => {
+      const { sessionId } = data;
+      console.log('data.sessionId: ' + sessionId)
+      // attach the session ID to the next reconnection attempts
+      socket.auth = { sessionId };
+      // store it in the localStorage
+      localStorage.setItem("sessionID", sessionId);
+      // save the ID of the user
+      socket.userId = currentUser._id;
+    })
+
+    // new user add queue
+    socket.current.on("user-connected", (data) => {
+      console.log('user-connected')
+      setContacts((prev)=>[...prev,data]);
+    });
+
+    // remove user from queue
+    socket.current.on("user-disconnected", (data) => {
+      if(contacts != null && contacts.length > 0){
+        const newContacts = contacts.filter((x) => x._id != data._id);
+        setContacts(newContacts);
+      }
+    });
+
+  }
+
+  /**
+   * Get all user messages
+   * @returns 
+   */
+  const getAllQueue = async()=>{
+    
+    const data = await  axios.get(`${allQueueRoute}`);
+    
+    if(data.status != 200 ) {
+      console.error("Internal error");
+      return;
+    }
+
+    setContacts(data.data);
+  }
+
   useEffect( ()=>{
     const navigationTo = async () => {
       if (!localStorage.getItem('chat-app-user'))
@@ -25,85 +81,44 @@ export default function Chats() {
         navigate("/login");
       }
       else {
-        setCurrentUser(await JSON.parse(localStorage.getItem('chat-app-user')));
-        setIsLoaded(true);
+        let  userData = await JSON.parse(localStorage.getItem('chat-app-user'));
+        if(! userData.isAvatarImageSet) navigate('/setAvatar');
+        setCurrentUser(userData);
       }
     }
     navigationTo();
    }, []);
 
-   useEffect(()=>{
-    if(currentUser){
-      
-      const userId  = currentUser._id;
-      const sessionId = localStorage.getItem("sessionID");
+  useEffect(()=>{
+  if(currentUser){
+    
+    setUpSocket();
+    getAllQueue();
+    setIsLoaded(true);
+  }
+  },[currentUser]);
 
-      if (sessionId) {
-        socket.current = io(host);
-        socket.current.auth = {  sessionId  };
-        socket.current.connect();
-      }else{
-        socket.current = io(host, { autoConnect: false });
-        socket.current.auth = {  userId  };
-        socket.current.connect();
-      }
-
-      //socket.current.emit("add-agent", userId);
-      socket.current.on("add-session", (data) => {
-        const { sessionId, userId } = data;
-        console.log(data.sessionId + ' - ' + data.userId)
-        // attach the session ID to the next reconnection attempts
-        socket.auth = { sessionId };
-        // store it in the localStorage
-        localStorage.setItem("sessionID", sessionId);
-        // save the ID of the user
-        socket.userId = userId;
-      })
-
-      // new user add queue
-      socket.current.on("add-user", (data) => {
-        setContacts((prev)=>[...prev,data]);
-      });
-
-      // remove user from queue
-      socket.current.on("remove-user", (data) => {
-        if(contacts != null && contacts.length > 0){
-          const newContacts = contacts.filter((x) => x._id != data._id);
-          setContacts(newContacts);
-        }
-      });
-
-    }
-   },[currentUser]);
-
-  useEffect( () => {
-    const getCurrentUser = async()=>{
-      if( currentUser)  {
-      if(currentUser.isAvatarImageSet){
-        //const data = await  axios.get(`${allUsersRoute}/${currentUser._id}`);
-        const data = await  axios.get(`${allQueueRoute}`);
-        setContacts(data.data);
-      } else{
-        navigate('/setAvatar');
-      }
-    }
-    }
-      getCurrentUser();
-  }, [currentUser]);
-
+  
   const handleChatChange = (chat) =>{
     setCurrentChat(chat);
+  }
+
+  const handleSocketConnection = () =>{
+    if(socket.current){
+      socket.current.disconnect();
+    }
   }
 
   return (
     <Container>
       <div className="container">
         
-        <Contacts contacts={contacts} currentUser={currentUser} socket={socket}  changeChat={handleChatChange}/>
-        { isLoaded &&
-          currentChat === undefined ?
-           <Welcome currentUser={currentUser}/> : 
-          <ChatContainer currentChat={currentChat} socket={socket} currentUser={currentUser} />
+        <Contacts contacts={contacts} currentUser={currentUser} closeSocket={handleSocketConnection} changeChat={handleChatChange}/>
+        { (isLoaded && currentChat === undefined ) && 
+           <Welcome currentUser={currentUser}/>
+        }
+        { (isLoaded && currentChat !== undefined ) && 
+           <ChatContainer currentChat={currentChat} socket={socket} currentUser={currentUser} />
         }
       </div>
     </Container>

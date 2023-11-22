@@ -3,13 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { BiPowerOff } from "react-icons/bi";
 import styled from "styled-components";
 import axios from "axios";
-export default function Logout(socket) {
+export default function Logout({logoutEvent}) {
   const navigate = useNavigate();
+  
   const handleClick =  () => {
-
-    if(socket){
-      if(socket.current) socket.current.close();
-    }
+    logoutEvent(true)
     localStorage.clear();
     navigate("/login");
   };

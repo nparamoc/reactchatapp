@@ -20,5 +20,6 @@ export default function App() {
       <Route path='/' element={ <Chats/> }/>
     </Routes>
     </BrowserRouter>
+    
   )
 }

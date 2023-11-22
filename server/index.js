@@ -7,16 +7,20 @@ const agentRoutes = require("./routes/agentRoutes");
 const messageRoute = require("./routes/messagesRoute");
 const queueRoute = require("./routes/queueRoute");
 const socket = require("socket.io");
-const sessionModel = require("./models/agentSessionModel");
+const agentSessionModel = require("./models/agentSessionModel");
+
+//temp
+const queueModel = require("./models/queueModel");
+const messageModel = require("./models/messageModel");
 
 dotenv.config();
 app.use(cors());
 app.use(express.json());
 
 //store all online users inside this map
-global.onlineAgent =  new Map();
+//global.onlineAgent =  new Map();
 global.onlineUser =  new Map();
-global.chatSocket = null;
+global.io = null;
 
 app.use("/api/auth", agentRoutes);
 app.use("/api/message", messageRoute);
@@ -28,7 +32,12 @@ mongoose.connect(process.env.MONGO_URL, {
     useNewUrlParser: true,
     useUnifiedTopology: true
     }).then(() => {
-        console.log("DB Connection Successful!")
+        console.log("DB Connection Successful!");
+
+        agentSessionModel.deleteMany({}).then(x => console.log('agentSessionModel ok'));
+        queueModel.deleteMany({}).then(x => console.log('queueModel ok'));
+        messageModel.deleteMany({}).then(x => console.log('messageModel ok'));
+
     }).catch((err) => console.log(err));
 
 
@@ -48,27 +57,38 @@ const io = socket(server,{
  
 io.on("connection",(socket)=>{
     
-    console.log(`socket.id: ${socket.id} - socket.sessionId: ${socket.sessionId} - socket.userId: ${socket.userId}`);
+    console.log(`socket.id: ${socket.id} - socket.sessionId: ${socket.sessionId} - socket.agent: ${socket.agent}`);
     
-    // persist session
-    
-    createSession({
-        sessionId: socket.sessionId,
-        agent: socket.userId,
-        connected: true,
-    });
-    
-    // join the "userId" room
-    socket.join(socket.userId);
+    // join the "sessionId" room
+    //socket.join(socket.sessionId);
+    socket.join(socket.agent);
 
-    // emit session details to specifict room
-    socket.to(socket.userId).emit("add-session", {
-        sessionId: socket.sessionId,
-        userId: socket.userId
+    // emit session details to specifict socket
+    socket.emit("agent-session", {
+        sessionId: socket.sessionId
     });
-     
+
+    /*
+    socket.on("disconnect", async () => {
+
+        const socketRoomClients = await io.in(socket.agent).allSockets();
+        const isDisconnected = socketRoomClients.size === 0;
+        if (isDisconnected) {
+          // notify other users
+          socket.broadcast.emit("user-disconnected", socket.userID);
+          // update the connection status of the session
+          sessionStore.saveSession(socket.sessionID, {
+            userID: socket.userID,
+            username: socket.username,
+            connected: false,
+          });
+        }
+    });
+    */
+
+    
     socket.on("send-msg",(data)=>{
-        const sendUserSocket = onlineAgent.get(data.to);
+        //const sendUserSocket = onlineAgent.get(data.to);
         if(sendUserSocket) {
             // sent to specifict client connection
             socket.to(sendUserSocket).emit("msg-recieved",data.message);
@@ -78,48 +98,59 @@ io.on("connection",(socket)=>{
 });
 
 // io middleware
-io.use((socket, next) => {
+io.use(async (socket, next) => {
     
     const sessionId = socket.handshake.auth.sessionId;
     if (sessionId) {
-        // find existing session
-        const session = sessionModel.findOne({ sessionId: sessionId });
-        if (session) {
-          console.log('Exist')
-          socket.sessionId = session.sessionId;
-          socket.userId = session.agent;
-          return next();
+        const filter = { _id: sessionId }
+        const agentSession = await agentSessionModel.findOne(filter);
+        
+        if (agentSession) {
+            console.log(`Exist session session.agent: ${agentSession.agent} - session.connect: ${agentSession.connected}  - session._id: ${agentSession._id}`);
+            socket.sessionId = agentSession._id;
+            socket.agent = agentSession.agent;
+            socket.connected = agentSession.connected;
+            return next();
         }
     }
 
     const userId = socket.handshake.auth.userId;
-    if (!userId) {
-        return next(new Error("invalid userId"));
-    }
-    console.log('New')
+    if (!userId) return next(new Error("userId requerid"));
+
     // create new session
-    socket.sessionId = randomId();
-    socket.userId = userId;
+    const newSessionId = await createSession({
+        agent: userId,
+        connected: true,
+    });
+
+    if(! newSessionId) return next(new Error("error create session"));
+    socket.sessionId = newSessionId;
+    socket.agent = userId;
+    socket.connected = true;
+
+    console.log(`New`)
+
     next();
 });
 
-global.chatSocket = io;
+global.io = io;
 
 
-
-function randomId() { 
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
-    .replace(/[xy]/g, function (c) { 
-        const r = Math.random() * 16 | 0,  
-            v = c == 'x' ? r : (r & 0x3 | 0x8); 
-        return v.toString(16); 
-    }); 
-}
 
 async function createSession (data){
-    const newSession = await sessionModel.create({
-        sessionId: data.sessionId,
+    const item = await agentSessionModel.create({
         connected: data.connected,
-        agent:data.agent,
+        agent:data.agent
     });
+
+    if(!item) return null;
+
+    return item._id
 }
+
+// Todo:
+/*
+queueContoller, add user to queue when no exist agent
+what happends with the socket's sessions if server crash
+chats.jsx emit new user also, get user when is the first connection
+*/
