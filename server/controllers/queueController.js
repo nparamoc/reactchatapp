@@ -2,30 +2,20 @@ const queueModel = require("../models/queueModel");
 const messageModel = require("../models/messageModel");
 const agentSessionModel = require("../models/agentSessionModel");
 const agentModel = require("../models/agentModel");
+const enums = require("../conts/enums");
 
 module.exports.addMessage = async (req, res, next) => {
     try {
 
         const body =  req.body;
 
-        ///////// agent
-        /*
-        io.to(body.kind).emit("msg-recieved", body.message);
-        io.to(body.channel).emit("msg-recieved", body.message);
-        return res.status(200).json({
-            msg: "body mustn't d",
-            state: 200
-        });
-        */
-        ////
-        
         // validations
         if(body == null || body == undefined) return res.status(400).json({
             msg: "body mustn't be null",
             state: 400
         });
 
-        if((body.kind == null || body.kind == undefined) || 
+        if((body.type == null || body.type == undefined) || 
             (body.conversationId == null || body.conversationId == undefined) || 
             (body.channel == null || body.channel == undefined) ||
             (body.message == null || body.message == undefined)) return res.status(400).json({
@@ -37,7 +27,7 @@ module.exports.addMessage = async (req, res, next) => {
          let filter = { _id: body.conversationId  };
          const queueEntity = await queueModel.findOne(filter);
          if(queueEntity == null ) return res.status(500).json({
-             msg: "Error not exist conversationId",
+            msg: "Error conversationId not exist ",
              state: 500
          });
 
@@ -46,16 +36,16 @@ module.exports.addMessage = async (req, res, next) => {
             
             // get agent session
             filter = { agent: queueEntity.agentId };
-            const onlineAgent = await agentSessionModel.findOne(filter);
-            if(onlineAgent == null) return res.status(500).json({
+            const agentSessionEntity = await agentSessionModel.findOne(filter);
+            if(agentSessionEntity == null) return res.status(500).json({
                 msg: "Agent error ",
                 state: 500
             });
             
-            console.log(`onlineAgent: ${onlineAgent.agent} - body.kind: ${body.kind}`);
+            console.log(`agent: ${agentSessionEntity.agent} - _id: ${agentSessionEntity._id} - body.type: ${body.type}`);
 
             // sent to specifict room connection
-            io.to(onlineAgent.agent.toString()).emit("msg-recieved", body.message.toString());
+            io.to(agentSessionEntity._id.toString()).emit("msg-recieved", body.message.toString());
 
             // create message
             const message = await messageModel.create({
@@ -65,11 +55,11 @@ module.exports.addMessage = async (req, res, next) => {
                 sender: queueEntity._id,
                 users: [
                     queueEntity._id,
-                    onlineAgent.agent
+                    agentSessionEntity.agent
                 ],
                 conversationId: queueEntity._id,
                 user: queueEntity._id,
-                agent:onlineAgent.agent,
+                agent:agentSessionEntity.agent,
             });
 
             
@@ -128,7 +118,7 @@ module.exports.addUserQueue = async (req, res, next) => {
             state: 400
         });
 
-        if((body.kind == null || body.kind == undefined) || 
+        if((body.type == null || body.type == undefined) || 
             (body.conversationIdReference == null || body.conversationIdReference == undefined) || 
             (body.channel == null || body.channel == undefined)  || 
             (body.userName == null || body.userName == undefined)) return res.status(400).json({
@@ -184,7 +174,7 @@ module.exports.pickUserQueue = async (req, res, next) => {
             state: 400
         });
 
-        if((body.kind == null || body.kind == undefined) || 
+        if((body.type == null || body.type == undefined) || 
             (body.conversationId == null || body.conversationId == undefined) || 
             (body.channel == null || body.channel == undefined)  ||
             (body.agentId == null || body.agentId == undefined)) return res.status(400).json({
@@ -200,12 +190,6 @@ module.exports.pickUserQueue = async (req, res, next) => {
             state: 500
         });
 
-        // user already asigned 
-        if(queueEntity.agentId != null && queueEntity.agentId != '' ) return res.status(200).json({
-            msg: "User queue already asigned",
-            state: 100
-        });
-
         // get agent
         filter = { _id: body.agentId  };
         let agentEntity = await agentModel.findOne(filter);
@@ -213,6 +197,14 @@ module.exports.pickUserQueue = async (req, res, next) => {
             msg: "Agent Id error ",
             state: 500
         });
+
+        // user from quequ already asigned to diferent agent
+        if(queueEntity.agentId != null && queueEntity.agentId != '' ) 
+            if(queueEntity.agentId != queueEntity.agentId) return res.status(200).json({
+            msg: "User queue already asigned",
+            state: enums.ApiCodes.UserQueueAlreadyAsigned
+        });
+
 
         // get agent session
         filter = { agent: agentEntity._id  };

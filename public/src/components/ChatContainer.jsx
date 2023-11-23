@@ -46,7 +46,7 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
       const response = await axios.post(pickUserRoute, {
         agentId: currentUser._id,
         conversationId: currentChat._id,
-        kind: 'kind_abc',
+        type: 'type_abc',
         channel: 'channel_abc',
       });
 
@@ -97,6 +97,10 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
       from: currentUser._id,
       to: currentChat._id,
       message: msg,
+      agentId: currentUser._id,
+      conversationId: currentChat._id,
+      type: 'type_abc',
+      channel: 'channel_abc',
     });
     socket.current.emit("send-msg", {
       to: currentChat._id,
@@ -155,8 +159,8 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
                   <div ref={scrollRef} key={uuidv4()}>
                     <div 
                       className={`message ${message.fromSelf ?
-                        "sended" :
-                        "recieved"
+                        "recieved":
+                        "sended"
                         }`}
                     >
                       <div className="content ">

@@ -21,26 +21,11 @@ export default function Chats() {
   const setUpSocket = async()=>{
    
     const userId  = currentUser._id;
-    const sessionId = localStorage.getItem("sessionID");
+    //const sessionId = localStorage.getItem("sessionID");
 
     socket.current = io(host, { autoConnect: false });
-    if (sessionId) {
-      socket.current.auth = {  sessionId  };
-    }else{
-      socket.current.auth = {  userId  };
-    }
+    socket.current.auth = {  userId  };
     socket.current.connect();
-
-    socket.current.on("agent-session", (data) => {
-      const { sessionId } = data;
-      console.log('data.sessionId: ' + sessionId)
-      // attach the session ID to the next reconnection attempts
-      socket.auth = { sessionId };
-      // store it in the localStorage
-      localStorage.setItem("sessionID", sessionId);
-      // save the ID of the user
-      socket.userId = currentUser._id;
-    })
 
     // new user add queue
     socket.current.on("user-connected", (data) => {

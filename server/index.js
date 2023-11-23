@@ -60,62 +60,26 @@ io.on("connection",(socket)=>{
     console.log(`socket.id: ${socket.id} - socket.sessionId: ${socket.sessionId} - socket.agent: ${socket.agent}`);
     
     // join the "sessionId" room
-    //socket.join(socket.sessionId);
-    socket.join(socket.agent);
-
-    // emit session details to specifict socket
-    socket.emit("agent-session", {
-        sessionId: socket.sessionId
-    });
-
-    /*
-    socket.on("disconnect", async () => {
-
-        const socketRoomClients = await io.in(socket.agent).allSockets();
-        const isDisconnected = socketRoomClients.size === 0;
-        if (isDisconnected) {
-          // notify other users
-          socket.broadcast.emit("user-disconnected", socket.userID);
-          // update the connection status of the session
-          sessionStore.saveSession(socket.sessionID, {
-            userID: socket.userID,
-            username: socket.username,
-            connected: false,
-          });
-        }
-    });
-    */
-
-    
-    socket.on("send-msg",(data)=>{
-        //const sendUserSocket = onlineAgent.get(data.to);
-        if(sendUserSocket) {
-            // sent to specifict client connection
-            socket.to(sendUserSocket).emit("msg-recieved",data.message);
-        }
-    });
+    socket.join(socket.sessionId);
 
 });
 
 // io middleware
 io.use(async (socket, next) => {
     
-    const sessionId = socket.handshake.auth.sessionId;
-    if (sessionId) {
-        const filter = { _id: sessionId }
-        const agentSession = await agentSessionModel.findOne(filter);
-        
-        if (agentSession) {
-            console.log(`Exist session session.agent: ${agentSession.agent} - session.connect: ${agentSession.connected}  - session._id: ${agentSession._id}`);
-            socket.sessionId = agentSession._id;
-            socket.agent = agentSession.agent;
-            socket.connected = agentSession.connected;
-            return next();
-        }
-    }
-
     const userId = socket.handshake.auth.userId;
     if (!userId) return next(new Error("userId requerid"));
+
+    const filter = { agent: userId }
+    const agentSession = await agentSessionModel.findOne(filter);
+
+    if (agentSession) {
+        console.log(`Exist session session.agent: ${agentSession.agent} - session.connect: ${agentSession.connected}  - session._id: ${agentSession._id}`);
+        socket.sessionId = agentSession._id.toString();
+        socket.agent = agentSession.agent;
+        socket.connected = agentSession.connected;
+        return next();
+    }
 
     // create new session
     const newSessionId = await createSession({
@@ -124,11 +88,11 @@ io.use(async (socket, next) => {
     });
 
     if(! newSessionId) return next(new Error("error create session"));
-    socket.sessionId = newSessionId;
+    socket.sessionId = newSessionId.toString();
     socket.agent = userId;
     socket.connected = true;
 
-    console.log(`New`)
+    console.log(`New session session.agent: ${userId} - session.connect: ${true}  - session._id: ${newSessionId}`);
 
     next();
 });
