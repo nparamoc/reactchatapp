@@ -46,6 +46,15 @@ const server = app.listen(process.env.PORT, ()=>{
     console.log(`Server started on Port ${process.env.PORT}`);
 });
 
+// status
+app.get('/status', (request, response) => {
+    const status = {
+       'Status': 'Running'
+    };
+    
+    response.status(200).send(status);
+});
+
 
 const io = socket(server,{
     cors: {

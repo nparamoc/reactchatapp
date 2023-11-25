@@ -17,9 +17,9 @@ module.exports.addMessage = async (req, res, next) => {
 
         if((body.type == null || body.type == undefined) || 
             (body.conversationId == null || body.conversationId == undefined) || 
-            (body.channel == null || body.channel == undefined) ||
+            (body.channelId == null || body.channelId == undefined) ||
             (body.agentId == null || body.agentId == undefined) ||
-            (body.message == null || body.message == undefined)) return res.status(400).json({
+            (body.text == null || body.text == undefined)) return res.status(400).json({
             msg: "body invalid",
             state: 400
         });
@@ -50,10 +50,10 @@ module.exports.addMessage = async (req, res, next) => {
         let _uniqueId = `${dNow.toISOString()}_${(Math.random() + 1).toString(36).substring(7)}`;
         
         // sent to API integration.
-        const msg = await axios.post(process.env.MS_BOTURL, {
+        const msg = await axios.post(process.env.MS_BOTURL + '/api/contactcenter', {
             type: body.type,
             id: _uniqueId,
-            text: body.message,
+            text: body.text,
             channelId: body.channel,
             botreference: {
                 conversationId: queueEntity.conversationIdReference,
@@ -73,7 +73,7 @@ module.exports.addMessage = async (req, res, next) => {
         // create db message
         const data = await messageModel.create({
             message:{
-                text: body.message
+                text: body.text
             },
             sender: agentSessionEntity.agent,
             users: [
@@ -99,6 +99,7 @@ module.exports.addMessage = async (req, res, next) => {
 
 
     } catch (err) {
+        console.error(`[messagesController] error: ${err}`);
         next(err);
     }
 };
@@ -117,6 +118,7 @@ module.exports.getAllMessage = async (req, res, next) => {
 
         res.json(projectMessages);
     } catch (error) {
+        console.error(`[messagesController] error: ${err}`);
         next(error);
     }
 };

@@ -46,8 +46,8 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
       const response = await axios.post(pickUserRoute, {
         agentId: currentUser._id,
         conversationId: currentChat._id,
-        type: 'type_abc',
-        channel: 'channel_abc',
+        type: 1,
+        channelId: 2,
       });
 
       if(response.status != 200 ) {
@@ -93,21 +93,28 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
 
  
   const handleSendMsg = async (msg) => {
-    await axios.post(sendMessageRoute, {
+    const response = await axios.post(sendMessageRoute, {
       from: currentUser._id,
       to: currentChat._id,
-      message: msg,
+      text: msg,
       agentId: currentUser._id,
       conversationId: currentChat._id,
-      type: 'type_abc',
-      channel: 'channel_abc',
+      type: 1,
+      channelId: 2,
     });
+
+    if(response.status != 200 ) {
+      toast.error("Internal error", toastOptions);
+      return false;
+    }
+
+    /*
     socket.current.emit("send-msg", {
       to: currentChat._id,
       from: currentUser._id,
       message: msg,
     });
-
+    */
     const msgs = [...messages];
     msgs.push({
       fromSelf: true,

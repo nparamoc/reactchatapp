@@ -16,15 +16,15 @@ module.exports.addMessage = async (req, res, next) => {
         });
 
         if((body.type == null || body.type == undefined) || 
-            (body.conversationId == null || body.conversationId == undefined) || 
-            (body.channel == null || body.channel == undefined) ||
-            (body.message == null || body.message == undefined)) return res.status(400).json({
+            (body.conversationid == null || body.conversationid == undefined) || 
+            (body.channelId == null || body.channelId == undefined) ||
+            (body.text == null || body.text == undefined)) return res.status(400).json({
             msg: "body invalid",
             state: 400
         });
 
          // get queue
-         let filter = { _id: body.conversationId  };
+         let filter = { _id: body.conversationid  };
          const queueEntity = await queueModel.findOne(filter);
          if(queueEntity == null ) return res.status(500).json({
             msg: "Error conversationId not exist ",
@@ -45,12 +45,12 @@ module.exports.addMessage = async (req, res, next) => {
             console.log(`agent: ${agentSessionEntity.agent} - _id: ${agentSessionEntity._id} - body.type: ${body.type}`);
 
             // sent to specifict room connection
-            io.to(agentSessionEntity._id.toString()).emit("msg-recieved", body.message.toString());
+            io.to(agentSessionEntity._id.toString()).emit("msg-recieved", body.text.toString());
 
             // create message
             const message = await messageModel.create({
                 message:{
-                    text: body.message
+                    text: body.text
                 },
                 sender: queueEntity._id,
                 users: [
@@ -76,7 +76,7 @@ module.exports.addMessage = async (req, res, next) => {
             // create message
             const message = await messageModel.create({
                 message:{
-                    text: body.message
+                    text: body.text
                 },
                 sender: queueEntity._id,
                 users: [
@@ -103,6 +103,7 @@ module.exports.addMessage = async (req, res, next) => {
         });
 
     } catch (err) {
+        console.error(`[queueController] error: ${err}`);
         next(err);
     }
 };
@@ -120,7 +121,7 @@ module.exports.addUserQueue = async (req, res, next) => {
 
         if((body.type == null || body.type == undefined) || 
             (body.conversationIdReference == null || body.conversationIdReference == undefined) || 
-            (body.channel == null || body.channel == undefined)  || 
+            (body.channelId == null || body.channelId == undefined)  || 
             (body.userName == null || body.userName == undefined)) return res.status(400).json({
             msg: "body invalid",
             state: 400
@@ -130,7 +131,8 @@ module.exports.addUserQueue = async (req, res, next) => {
             agentId: '',
             isInQueue:true,
             conversationIdReference:body.conversationIdReference ,
-            userName: body.userName
+            userName: body.userName,
+            channelId: body.channelId
         });
 
         if(!queue) return res.status(500).json({
@@ -160,6 +162,7 @@ module.exports.addUserQueue = async (req, res, next) => {
         });
 
     } catch (err) {
+        console.error(`[queueController] error: ${err}`);
         next(err);
     }
 };
@@ -176,7 +179,7 @@ module.exports.pickUserQueue = async (req, res, next) => {
 
         if((body.type == null || body.type == undefined) || 
             (body.conversationId == null || body.conversationId == undefined) || 
-            (body.channel == null || body.channel == undefined)  ||
+            (body.channelId == null || body.channelId == undefined)  ||
             (body.agentId == null || body.agentId == undefined)) return res.status(400).json({
             msg: "body invalid",
             state: 400
@@ -245,6 +248,7 @@ module.exports.pickUserQueue = async (req, res, next) => {
        
 
     } catch (err) {
+        console.error(`[queueController] error: ${err}`);
         next(err);
     }
 };

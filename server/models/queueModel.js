@@ -20,6 +20,11 @@ const queueSchema = new mongoose.Schema({
         unique: false,
         max: 30,
     },
+    channelId:{
+        type: String,
+        required: false,
+        unique: false
+    },
     isInQueue: {
         type: Boolean,
         default: true,
