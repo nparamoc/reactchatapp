@@ -38,66 +38,66 @@ module.exports.register = async (req, res, next) => {
     } catch (ex) {
       next(ex);
     }
-  };
+};
 
-  module.exports.setAvatar = async (req, res, next) => {
-    try {
-      const userId = req.params.id;
-      const avatarImage = req.body.image;
-      const userData = await agentModel.findByIdAndUpdate(
-        userId,
-        {
-          isAvatarImageSet: true,
-          avatarImage,
-        },
-        { new: true }
-      );
-      return res.json({
-        isSet: userData.isAvatarImageSet,
-        image: userData.avatarImage,
-      });
-    } catch (ex) {
-      next(ex);
-    }
-  };
+module.exports.setAvatar = async (req, res, next) => {
+  try {
+    const userId = req.params.id;
+    const avatarImage = req.body.image;
+    const userData = await agentModel.findByIdAndUpdate(
+      userId,
+      {
+        isAvatarImageSet: true,
+        avatarImage,
+      },
+      { new: true }
+    );
+    return res.json({
+      isSet: userData.isAvatarImageSet,
+      image: userData.avatarImage,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
 
-  module.exports.getAllUsers = async (req, res, next) => {
-    try {
-      const users  = await agentModel.find({
-        _id:{ $ne:req.params.id }
-      }).select([
-        "email",
-        "username",
-        "avatarImage",
-        "_id"
-      ]);
-      return res.json(users);
-    } catch (err) {
-      next(err);
-    }
-  };
+module.exports.getAllUsers = async (req, res, next) => {
+  try {
+    const users  = await agentModel.find({
+      _id:{ $ne:req.params.id }
+    }).select([
+      "email",
+      "username",
+      "avatarImage",
+      "_id"
+    ]);
+    return res.json(users);
+  } catch (err) {
+    next(err);
+  }
+};
 
-  module.exports.logOut = (req, res, next) => {
-    try {
-      if (!req.params.id) return res.json({ msg: "User id is required " });
-      onlineAgent.delete(req.params.id);
-      return res.status(200).send();
-    } catch (ex) {
-      next(ex);
-    }
-  };
+module.exports.logOut = (req, res, next) => {
+  try {
+    if (!req.params.id) return res.json({ msg: "User id is required " });
+    onlineAgent.delete(req.params.id);
+    return res.status(200).send();
+  } catch (ex) {
+    next(ex);
+  }
+};
 
-  module.exports.getAllQueue = async (req, res, next) => {
-    try {
-      const users  = await queueModel.find({isInQueue:true}).select([
-        "isInQueue",
-        "agentId",
-        "userName",
-        "conversationIdReference",
-        "_id"
-      ]);
-      return res.json(users);
-    } catch (err) {
-      next(err);
-    }
-  };
+module.exports.getAllQueue = async (req, res, next) => {
+  try {
+    const users  = await queueModel.find({isInQueue:true}).select([
+      "isInQueue",
+      "agentId",
+      "userName",
+      "conversationIdReference",
+      "_id"
+    ]);
+    return res.json(users);
+  } catch (err) {
+    next(err);
+  }
+};

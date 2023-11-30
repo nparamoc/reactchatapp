@@ -3,6 +3,7 @@ const messageModel = require("../models/messageModel");
 const agentSessionModel = require("../models/agentSessionModel");
 const agentModel = require("../models/agentModel");
 const enums = require("../conts/enums");
+const axios = require("axios");
 
 module.exports.addMessage = async (req, res, next) => {
     try {
@@ -235,6 +236,30 @@ module.exports.pickUserQueue = async (req, res, next) => {
         filter = { user: doc._id, agent: null  };
         update = { agent: agentEntity._id, users:[ doc._id , agentEntity._id]  };
         await messageModel.updateMany(filter, update);
+
+
+        let dNow = new Date();
+        let _uniqueId = `${dNow.toISOString()}_${(Math.random() + 1).toString(36).substring(7)}`;
+        
+        // sent to API integration.
+        const msg = await axios.post(process.env.MS_BOTURL + '/api/contactcenter', {
+            type: body.type,
+            id: _uniqueId,
+            channelId: body.channel,
+            timestamp: dNow.toUTCString(),
+            botreference: {
+                conversationId: queueEntity.conversationIdReference
+            },
+            contactcenterreference: {
+                state : enums.ConversationStatus.Open,
+                conversationid: queueEntity._id
+            }
+        });
+
+        if(msg.status != 200 ) return res.status(500).json({ 
+            msg: "Failed to send event",
+            state: 500
+        });
         
         return res.json({
             msg: "Message sent successfully!",

@@ -26,7 +26,7 @@ module.exports.addMessage = async (req, res, next) => {
 
         if( process.env.MS_BOTURL == undefined) return res.status(500).json({
             msg: "MS_BOTURL is null",
-            state: 500
+            state: 500 
         });
 
         // get queue
@@ -55,9 +55,9 @@ module.exports.addMessage = async (req, res, next) => {
             id: _uniqueId,
             text: body.text,
             channelId: body.channel,
+            timestamp: dNow.toUTCString(),
             botreference: {
-                conversationId: queueEntity.conversationIdReference,
-                timestamp: dNow.toUTCString()
+                conversationId: queueEntity.conversationIdReference
             },
             contactcenterreference: {
                 state : enums.ConversationStatus.Open,
@@ -91,6 +91,22 @@ module.exports.addMessage = async (req, res, next) => {
             state: 500
         });
   
+        // update from queue
+        if(body.type == enums.ActivtyType.EndOfConversation){
+            
+            filter = { _id: body.conversationId  };
+            let update = { isInQueue:false  };
+            let doc = await queueModel.findOneAndUpdate(filter, update);
+
+            if(! doc) return res.status(500).json({
+                msg: "Error udpate from queue",
+                state: 500
+            });
+            
+            // notify all agent
+            io.emit("user-disconnected", {_id : body.conversationId });
+            
+        }
 
         return res.status(200).json({
             msg: "Message added successfully!",

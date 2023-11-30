@@ -1,19 +1,15 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
-import { BiPowerOff } from "react-icons/bi";
+import { BiPhoneOff } from "react-icons/bi";
 import styled from "styled-components";
-export default function Logout({logoutEvent}) {
-  const navigate = useNavigate();
+export default function Logout({handEvent}) {
   
   const handleClick =  () => {
-    logoutEvent(true)
-    localStorage.clear();
-    navigate("/login");
+    handEvent(true)
   };
 
   return (
     <Button onClick={handleClick}>
-      <BiPowerOff />
+      <BiPhoneOff />
     </Button>
   );
 }

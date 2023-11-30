@@ -2,7 +2,7 @@
 
 module.exports = {
      // Type Evenst
-    ActivtyType: {
+     ActivtyType: {
         Typing: 0,
         Message: 1,
         Events: 2,

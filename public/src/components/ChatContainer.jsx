@@ -1,12 +1,13 @@
-import React, { useState, useEffect , useRef} from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import styled from "styled-components"
 import ChatInput from './ChatInput';
-import Logout from './Logout';
+import Hang from './Hang';
 import axios from "axios";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { getAllMessagesRoute, sendMessageRoute, pickUserRoute } from '../utils/APIRoutes'
-import { v4 as uuidv4} from "uuid";
+import enums from '../utils/enums'
+import { v4 as uuidv4 } from "uuid";
 
 export default function ChatContainer({ currentChat, currentUser, socket }) {
   const [messages, setMessages] = useState([]);
@@ -18,19 +19,17 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
   const toastOptions = {
     //position: "bottom-right",
     autoClose: 8000,
-    //pauseOnHover: true,
-    //draggable: true,
+    pauseOnHover: true,
+    draggable: true,
     theme: "dark",
   };
-
-  
 
   /**
    * Init functions
    */
-  const initFunctions = async()=>{
+  const initFunctions = async () => {
     console.log(JSON.stringify(currentChat))
-    if(currentChat){
+    if (currentChat) {
       await pickUser();
       await getAllMessages();
       setinputEnable(true);
@@ -42,20 +41,20 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
    * @returns 
    */
   const pickUser = async () => {
-    if(currentUser){
+    if (currentUser) {
       const response = await axios.post(pickUserRoute, {
         agentId: currentUser._id,
         conversationId: currentChat._id,
-        type: 1,
+        type: enums.ActivtyType.AssignetAgent,
         channelId: 2,
       });
 
-      if(response.status != 200 ) {
+      if (response.status != 200) {
         toast.error("Internal error", toastOptions);
         return false;
       }
 
-      if(response.data.state == 100 ) {
+      if (response.data.state == enums.ApiCodes.UserQueueAlreadyAsigned) {
         toast.error("User already assigned", toastOptions);
         return false;
       }
@@ -65,19 +64,19 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
 
     return false;
   }
- 
+
   /**
    * Get all user messages
    * @returns 
    */
-  const getAllMessages = async()=>{
-    if( currentChat)  {
+  const getAllMessages = async () => {
+    if (currentChat) {
       const msj = await axios.post(getAllMessagesRoute, {
         from: currentChat._id,
         to: currentUser._id,
       });
-      
-      if(msj.status != 200 ) {
+
+      if (msj.status != 200) {
         toast.error("Internal error", toastOptions);
         return;
       }
@@ -85,13 +84,35 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
     }
   }
 
+  //handleHang
+  const handleHang = async () => {
+   
+    // close conversation
+    const response = await axios.post(sendMessageRoute, {
+      from: currentUser._id,
+      to: currentChat._id,
+      text: 'Close conversation',
+      agentId: currentUser._id,
+      conversationId: currentChat._id,
+      type: enums.ActivtyType.EndOfConversation,
+      channelId: 2,
+    });
+
+    if (response.status != 200) {
+      toast.error("Internal error", toastOptions);
+      return false;
+    }
+
+    setinputEnable(false);
+  }
+
   useEffect(() => {
-    if(doRequest.current) initFunctions();
+    if (doRequest.current) initFunctions();
     else doRequest.current = true;
-  },[currentChat]);
+  }, [currentChat]);
 
 
- 
+
   const handleSendMsg = async (msg) => {
     const response = await axios.post(sendMessageRoute, {
       from: currentUser._id,
@@ -103,7 +124,7 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
       channelId: 2,
     });
 
-    if(response.status != 200 ) {
+    if (response.status != 200) {
       toast.error("Internal error", toastOptions);
       return false;
     }
@@ -123,7 +144,7 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
     setMessages(msgs);
   };
 
- 
+
   useEffect(() => {
     socket.current.on("msg-recieved", (msg) => {
       console.log(`msg-recieved ${msg}`)
@@ -134,9 +155,9 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
     })
   }, []);
 
-  useEffect(()=>{
-    arrivalMessage && setMessages((prev)=>[...prev,arrivalMessage]);
-  },[arrivalMessage]);
+  useEffect(() => {
+    arrivalMessage && setMessages((prev) => [...prev, arrivalMessage]);
+  }, [arrivalMessage]);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -158,27 +179,29 @@ export default function ChatContainer({ currentChat, currentUser, socket }) {
                   <h3>{currentChat.username}</h3>
                 </div>
               </div>
-              <Logout />
+              {inputEnable &&
+                <Hang  handEvent={handleHang}  />
+              }
             </div>
             <div className="chat-messages">
               {messages.map((message) => {
                 return (
                   <div ref={scrollRef} key={uuidv4()}>
-                    <div 
+                    <div
                       className={`message ${message.fromSelf ?
-                        "recieved":
+                        "recieved" :
                         "sended"
                         }`}
                     >
                       <div className="content ">
-                        <p>{message.message}</p>
+                        <p>{message.message}</p> 
                       </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-            {inputEnable && 
+            {inputEnable &&
               <ChatInput handleSendMsg={handleSendMsg} />
             }
           </Container>
